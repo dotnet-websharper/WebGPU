@@ -5,8 +5,8 @@ open WebSharper.JavaScript
 open WebSharper.InterfaceGenerator
 
 module Definition =
-    let powerPreference = 
-        Pattern.EnumStrings "powerPreference" [
+    let PowerPreference = 
+        Pattern.EnumStrings "PowerPreference" [
             "undefined"
             "low-power"
             "high-performance"
@@ -377,8 +377,8 @@ module Definition =
             "srgb"; "display-p3"
         ]
 
-    let WGSLLanguageFeatures = 
-        Class "WGSLLanguageFeatures"
+    let GPUWGSLLanguageFeatures = 
+        Class "GPUWGSLLanguageFeatures"
         |+> Instance [
             "size" =? T<int>
 
@@ -391,7 +391,7 @@ module Definition =
 
     let GPUSupportedFeatures = 
         Class "GPUSupportedFeatures"
-        |=> Inherits WGSLLanguageFeatures
+        |=> Inherits GPUWGSLLanguageFeatures
 
     let GPUSupportedLimits =
         Pattern.Config "GPUSupportedLimits" {
@@ -1113,24 +1113,7 @@ module Definition =
                 "primitive", PrimitiveObject.Type
             ]
         }
-
-    let SamplerDescriptor =
-        Pattern.Config "SamplerDescriptor" {
-            Required = []
-            Optional = [
-                "addressModeU", AddressMode.Type
-                "addressModeV", AddressMode.Type
-                "addressModeW", AddressMode.Type
-                "compare", Compare.Type
-                "label", T<string>
-                "lodMinClamp", T<float>
-                "lodMaxClamp", T<float>
-                "maxAnisotropy", T<int>
-                "magFilter", FilterMode.Type
-                "minFilter", FilterMode.Type
-                "mipmapFilter", FilterMode.Type
-            ]
-        }
+        
 
     let GPUSamplerDescriptor = 
         Pattern.Config "GPUSamplerDescriptor" {
@@ -1267,8 +1250,8 @@ module Definition =
             "pushErrorScope" => GPUErrorFilter?filter ^-> T<unit>
         ]
 
-    let GPURequestDeviceDescriptor =
-        Pattern.Config "GPURequestDeviceDescriptor" {
+    let RequestDeviceDescriptor =
+        Pattern.Config "RequestDeviceDescriptor" {
             Required = []
             Optional = [
                 "defaultQueue", GPUQueue.Type
@@ -1280,23 +1263,21 @@ module Definition =
 
     let GPUAdapter = 
         Class "GPUAdapter"
-        |=> Nested [GPUSupportedFeatures; GPUSupportedLimits; GPUAdapterInfo; GPUDevice]
         |+> Instance [
             "features" =? GPUSupportedFeatures.Type
             "isFallbackAdapter" =? T<bool>
             "limits" =? GPUSupportedLimits.Type
 
             "requestAdapterInfo" => T<unit> ^-> T<Promise<_>>[GPUAdapterInfo]
-            "requestDevice" => !?GPURequestDeviceDescriptor?descriptor ^-> T<Promise<_>>[GPUDevice]
+            "requestDevice" => !?RequestDeviceDescriptor?descriptor ^-> T<Promise<_>>[GPUDevice]
         ] 
 
     let GPU = 
         Class "GPU"
-        |=> Nested [WGSLLanguageFeatures; powerPreference; GPUAdapter]
         |+> Instance [
-            "wgslLanguageFeatures" =? WGSLLanguageFeatures
+            "GPUWGSLLanguageFeatures" =? GPUWGSLLanguageFeatures
 
-            "requestAdapter" => !? powerPreference?options ^-> T<Promise<_>>[GPUAdapter]
+            "requestAdapter" => !? PowerPreference?options ^-> T<Promise<_>>[GPUAdapter]
             "getPreferredCanvasFormat" => T<unit> ^-> T<string>
         ]
 
@@ -1360,7 +1341,57 @@ module Definition =
     let Assembly =
         Assembly [
             Namespace "WebSharper.WebGPU" [
-                
+                //Class
+                GPU
+                GPUAdapter
+                GPUAdapterInfo
+                GPUBindGroup
+                GPUBindGroupLayout
+                GPUBuffer
+                GPUCanvasContext
+                GPUCommandBuffer
+                GPUCommandEncoder
+                GPUCompilationInfo
+                GPUCompilationMessage
+                GPUComputePassEncoder
+                GPUComputePipeline
+                GPUDevice
+                GPUDeviceLostInfo
+                GPUError
+                GPUExternalTexture
+                GPUInternalError
+                GPUOutOfMemoryError
+                GPUPipelineError
+                GPUPipelineLayout
+                GPUQuerySet
+                GPUQueue
+                GPURenderBundle
+                GPURenderBundleEncoder
+                GPURenderPassEncoder
+                GPURenderPipeline
+                GPUSampler
+                GPUShaderModule
+                GPUSupportedFeatures
+                GPUSupportedLimits
+                GPUTexture
+                GPUTextureView
+                GPUUncapturedErrorEvent
+                //Enum
+                ColorSpace; AlphaMode; GPUErrorFilter; VideoColorSpace; TextureDimension; FilterMode; AddressMode; GPUVertexFormat; StepMode; Topology
+                StripIndexFormat; FrontFace; CullMode; GPUColorWrite; BlendOperation; BlendFactor; StencilOperation; Compare; GPUCompilationMessageType
+                IndexFormat; TimestampLocation; StoreOp; LoadOp; GPUComputePassLocation; GPUQueryType; PowerPreference; GPUDeviceLostInfoReason
+                GPUAspect; DestinationColorSpace; GPUTextureDimension; DescriptorDimension; GPUBufferMapSate; GPUMapMode; GPUShaderStage
+                GPUFormat; GPUTextureUsage; GPUBufferUsage
+                //Interface
+                GPUTextureDataLayout; GPUImageDestination; GPUDestination; DestinationOrigin; CreateViewDescriptor; GPULabel; GPUImageSource
+                SourceOrigin; GPUWGSLLanguageFeatures; RenderPassDescriptor; DepthStencilAttachmentObject
+                ColorAttachmentObject; Colors; TimestampWrite; GPUComputePassDescriptor; GPUComputePassTimestampWrites; GPUCommandEncoderDescriptor
+                GPUBufferDescriptor; GPUBindGroupDescriptor; GPUBindGroupLayoutDescriptor; EntryObject; GPUBufferBinding; Size; GPUExtent3D
+                GPUSamplerDescriptor; GPURenderPipelineDescriptor; VertexObject; VertexBufferLayout; VertexAttribute; PrimitiveObject; MultisampleObject
+                FragmentObject; ColorTargetState; BlendState; BlendComponent; DepthStencilObject; StencilFaceState; GPURenderBundleEncoderDescriptor
+                GPUQuerySetDescriptor; GPUPipelineLayoutDescriptor; GPUComputePipelineDescriptor; GPUComputeConstant; GPUTextureCopyView
+                GPUBufferCopyView; GPURenderEncoder; GPUPipelineErrorReason; GPUUncapturedErrorEventOptions; GPUCanvasConfiguration; GPUCompute
+                RequestDeviceDescriptor; GPUExternalTextureDescriptor; GPUTextureDescriptor; SizeObject; GPUShaderModuleDescriptor
             ]
         ]
 
