@@ -511,6 +511,176 @@ module Definition =
             "createView" => CreateViewDescriptor?descrptor ^-> GPUTextureView
         ]
 
+    let DestinationOrigin = 
+        Pattern.Config "DestinationOrigin" {
+            Required = [
+                "x", T<int>
+                "y", T<int>
+                "z", T<int>
+            ]
+            Optional = []
+        }
+
+    let ArrayOrDestinationOrigin = !| T<int> + DestinationOrigin
+
+    let GPUDestination = 
+        Pattern.Config "GPUDestination" {
+            Required = []
+            Optional = [
+                "aspect", GPUAspect.Type
+                "mipLevel", T<int>
+                "origin", ArrayOrDestinationOrigin
+                "texture", GPUTexture.Type  
+            ]
+        }
+
+    let GPUImageDestination = 
+        Pattern.Config "GPUImageDestination" {
+            Required = []
+            Optional = [
+                "colorSpace", DestinationColorSpace.Type
+                "premultipliedAlpha", T<bool>
+            ]
+        }
+        |=> Inherits GPUDestination
+
+    let GPUCommandBuffer = 
+        Class "GPUCommandBuffer"
+        |=> Inherits GPULabel
+
+    let GPUBuffer = 
+        Class "GPUBuffer" 
+        |+> Instance [
+            "label" =@ T<string>
+
+            "mapState" =? GPUBufferMapSate.Type
+            "size" =? T<int>
+            "usage" =? GPUBufferUsage.Type
+
+            "destroy" => T<unit> ^-> T<unit>
+            "getMappedRange" => !? T<int>?offset * !? T<int>?size ^-> T<ArrayBuffer>
+            "mapAsync" => !? T<int>?offset * !? T<int>?size ^-> T<Promise<unit>>
+            "unmap" => T<unit> ^-> T<unit>
+        ]
+
+    let GPUTextureDataLayout = 
+        Pattern.Config "GPUTextureDataLayout" {
+            Required = []
+            Optional = [
+                "offset", T<int>
+                "bytesPerRow", T<int>
+                "rowsPerImage", T<int>
+            ]
+        }
+
+    let GPUExtent3D = 
+        Pattern.Config "GPUExtent3D" {
+            Required = [
+                "width", T<int>
+                "height", T<int>
+                "depthOrArrayLayers", T<int>
+            ]
+            Optional = []
+        }
+
+    let ArrayOrGPUExtent3D = !| T<int> + GPUExtent3D
+
+    let Size = 
+        Pattern.Config "Size" {
+            Required = [
+                "width", T<int>
+                "height", T<int>
+                "depth", T<int>
+            ]
+            Optional = []
+        }
+
+    let ArrayOrSize = !| T<int> + Size
+
+    let GPUQueue =
+        Class "GPUQueue"
+        |+> Instance [
+            "label" =@ T<string>
+
+            "copyExternalImageToTexture" => GPUImageSource?source * GPUImageDestination?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
+            "onSubmittedWorkDone" => T<unit> ^-> T<Promise<unit>>
+            "submit" => (!|GPUCommandBuffer)?commandBuffers ^-> T<unit>
+            "writeBuffer" => GPUBuffer?buffer * T<int>?bufferOffset * T<obj>?data * !? T<int>?dataOffset * !? T<int>?size ^-> T<unit>
+            "writeTexture" => GPUDestination?destination * T<obj>?data * GPUTextureDataLayout * ArrayOrSize?size ^-> T<unit>
+        ]
+
+    let GPUBindGroupLayout = 
+        Class "GPUBindGroupLayout"
+        |=> Inherits GPULabel
+
+    let GPUBindGroup = 
+        Class "GPUBindGroup"
+        |=> Inherits GPULabel
+
+    let GPUBufferBinding =  
+        Pattern.Config "GPUBufferBinding" {
+            Required = ["buffer", GPUBuffer.Type]
+            Optional = [
+                "offset", T<int>
+                "size", T<int>
+            ]
+        }
+
+    let EntryObject = 
+        Pattern.Config "EntryObject" {
+            Required = [
+                "binding", T<int>
+                "visibility", !| GPUShaderStage.Type
+            ]
+            Optional = []
+        }
+
+    let GPUBindGroupLayoutDescriptor = 
+        Pattern.Config "GPUBindGroupLayoutDescriptor" {
+            Required = ["entries", !| EntryObject]
+            Optional = ["label", T<string>]
+        }
+
+    let GPUBindGroupDescriptor = 
+        Pattern.Config "GPUBindGroupDescriptor" {
+            Required = [
+                "layout", GPUBindGroupLayout.Type
+            ]
+            Optional = []
+        }
+        |=> Inherits GPUBindGroupLayoutDescriptor
+
+    let GPUBufferDescriptor =
+        Pattern.Config "GPUBufferDescriptor" {
+            Required = [
+                "size", T<int>
+                "usage", GPUBufferUsage.Type
+            ]
+            Optional = [
+                "label", T<string>
+                "mappedAtCreation", T<bool>
+            ]
+        }
+
+    let GPUCommandEncoderDescriptor =
+        Pattern.Config "GPUCommandEncoderDescriptor" {
+            Required = []
+            Optional = [
+                "label", T<string>
+            ]
+        }    
+
+    let GPUQuerySet =
+        Class "GPUQuerySet"
+        |+> Instance [
+            "label" =@ T<string>
+
+            "count" =? T<int>            
+            "type" =? GPUQueryType
+
+            "destroy" => T<unit> ^-> T<unit>
+        ]
+
     
         
     let Assembly =
