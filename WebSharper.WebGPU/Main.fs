@@ -376,6 +376,142 @@ module Definition =
         Pattern.EnumStrings "ColorSpace" [
             "srgb"; "display-p3"
         ]
+
+    let WGSLLanguageFeatures = 
+        Class "WGSLLanguageFeatures"
+        |+> Instance [
+            "size" =? T<int>
+
+            "has" => T<obj>?value ^-> T<bool>
+            "values" => T<unit> ^-> T<obj>
+            "keys" => T<unit> ^-> T<obj>
+            "entries" => T<unit> ^-> T<obj>
+            "forEach" => T<obj>?callback * TSelf?thisArg ^-> T<unit>
+        ]
+
+    let GPUSupportedFeatures = 
+        Class "GPUSupportedFeatures"
+        |=> Inherits WGSLLanguageFeatures
+
+    let GPUSupportedLimits =
+        Pattern.Config "GPUSupportedLimits" {
+            Required = []
+            Optional = [
+                "maxTextureDimension1D", T<int>
+                "maxTextureDimension2D", T<int>
+                "maxTextureDimension3D", T<int>
+                "maxTextureArrayLayers", T<int>
+                "maxBindGroups", T<int>
+                "maxBindingsPerBindGroup", T<int>
+                "maxDynamicUniformBuffersPerPipelineLayout", T<int>
+                "maxDynamicStorageBuffersPerPipelineLayout", T<int>
+                "maxSampledTexturesPerShaderStage", T<int>
+                "maxSamplersPerShaderStage", T<int>
+                "maxStorageBuffersPerShaderStage", T<int>
+                "maxStorageTexturesPerShaderStage", T<int>
+                "maxUniformBuffersPerShaderStage", T<int>
+                "maxUniformBufferBindingSize", T<int>
+                "maxStorageBufferBindingSize", T<int>
+                "minUniformBufferOffsetAlignment", T<int>
+                "minStorageBufferOffsetAlignment", T<int>
+                "maxVertexBuffers", T<int>
+                "maxBufferSize", T<int>
+                "maxVertexAttributes", T<int>
+                "maxVertexBufferArrayStride", T<int>
+                "maxInterStageShaderComponents", T<int>
+                "maxInterStageShaderVariables", T<int>
+                "maxColorAttachments", T<int>
+                "maxColorAttachmentBytesPerSample", T<int>
+                "maxComputeWorkgroupStorageSize", T<int>
+                "maxComputeInvocationsPerWorkgroup", T<int>
+                "maxComputeWorkgroupSizeX", T<int>
+                "maxComputeWorkgroupSizeY", T<int>
+                "maxComputeWorkgroupSizeZ", T<int>
+                "maxComputeWorkgroupsPerDimension", T<int>
+            ]
+        }
+
+    let GPUAdapterInfo =
+        Class "GPUAdapterInfo"
+        |+> Instance [
+            "architecture" =? T<string>
+            "description" =? T<string>
+            "device" =? T<string>
+            "vendor" =? T<string>
+        ]
+
+    let GPUDeviceLostInfo = 
+        Class "GPUDeviceLostInfo"
+        |+> Instance [
+            "message" =? T<string>
+            "reason" =? GPUDeviceLostInfoReason.Type
+        ]
+
+    let SourceOrigin =
+        Pattern.Config "SourceOrigin" {
+            Required = [
+                "x", T<int>
+                "y", T<int>
+            ]
+            Optional = []
+        }
+
+    let ArrayOrSourceOrigin = !| T<int> + SourceOrigin
+
+    let GPUImageSource = 
+        Pattern.Config "GPUImageSource" {
+            Required = ["source", T<obj>]
+            Optional = [
+                "origin", ArrayOrSourceOrigin
+                "flipY", T<bool>
+            ]
+        }
+
+    let GPULabel = 
+        Pattern.Config "GPULabel" {
+            Required = []
+            Optional = [
+                "label", T<string>
+            ]
+        }
+
+    let GPUTextureView = 
+        Class "GPUTextureView"
+        |=> Inherits GPULabel
+
+    let CreateViewDescriptor = 
+        Pattern.Config "CreateViewDescriptor" {
+            Required = []
+            Optional = [
+                "arrayLayerCount", T<int>
+                "aspect", GPUAspect.Type
+                "baseArrayLayer", T<int>
+                "baseMipLevel", T<int>
+                "dimension", DescriptorDimension.Type
+                "format", GPUFormat.Type
+                "label", T<string>
+                "mipLevelCount", T<int>
+            ]
+        }
+
+    let GPUTexture =
+        Class "GPUTexture"
+        |+> Instance [
+            "label" =@ T<string>
+
+            "depthOrArrayLayers" =? T<int>
+            "dimension" =? GPUTextureDimension.Type
+            "format" =? GPUFormat.Type
+            "height" =? T<int>
+            "mipLevelCount" =? T<int>
+            "sampleCount" =? T<int>
+            "usage" =? GPUTextureUsage.Type
+            "width" =? T<int>
+
+            "createView" => CreateViewDescriptor?descrptor ^-> GPUTextureView
+        ]
+
+    
         
     let Assembly =
         Assembly [
