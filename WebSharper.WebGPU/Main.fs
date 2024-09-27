@@ -460,7 +460,7 @@ module Definition =
 
     let GPUImageSource = 
         Pattern.Config "GPUImageSource" {
-            Required = ["source", T<obj>]
+            Required = ["source", T<HTMLVideoElement> + T<HTMLCanvasElement> + T<OffscreenCanvas>]
             Optional = [
                 "origin", ArrayOrSourceOrigin
                 "flipY", T<bool>
@@ -559,7 +559,7 @@ module Definition =
 
             "destroy" => T<unit> ^-> T<unit>
             "getMappedRange" => !? T<int>?offset * !? T<int>?size ^-> T<ArrayBuffer>
-            "mapAsync" => !? T<int>?offset * !? T<int>?size ^-> T<Promise<unit>>
+            "mapAsync" => GPUMapMode?mode * !? T<int>?offset * !? T<int>?size ^-> T<Promise<unit>>
             "unmap" => T<unit> ^-> T<unit>
         ]
 
@@ -597,6 +597,8 @@ module Definition =
 
     let ArrayOrSize = !| T<int> + Size
 
+    let Data = T<ArrayBuffer> + T<DataView>
+
     let GPUQueue =
         Class "GPUQueue"
         |+> Instance [
@@ -605,8 +607,8 @@ module Definition =
             "copyExternalImageToTexture" => GPUImageSource?source * GPUImageDestination?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
             "onSubmittedWorkDone" => T<unit> ^-> T<Promise<unit>>
             "submit" => (!|GPUCommandBuffer)?commandBuffers ^-> T<unit>
-            "writeBuffer" => GPUBuffer?buffer * T<int>?bufferOffset * T<obj>?data * !? T<int>?dataOffset * !? T<int>?size ^-> T<unit>
-            "writeTexture" => GPUDestination?destination * T<obj>?data * GPUTextureDataLayout * ArrayOrSize?size ^-> T<unit>
+            "writeBuffer" => GPUBuffer?buffer * T<int>?bufferOffset * Data?data * !? T<int>?dataOffset * !? T<int>?size ^-> T<unit>
+            "writeTexture" => GPUDestination?destination * Data?data * GPUTextureDataLayout?dataLayout * ArrayOrSize?size ^-> T<unit>
         ]
 
     let GPUBindGroupLayout = 
@@ -700,6 +702,13 @@ module Definition =
             ]
         }
 
+    let GPUComputePipeline = 
+        Class "GPUComputePipeline"
+        |=> Inherits GPULabel
+        |+> Instance [
+            "getBindGroupLayout" => T<int>?index ^-> GPUBindGroupLayout
+        ]
+
     let GPUComputePassEncoder =
         Class "GPUComputePassEncoder"
         |+> Instance [
@@ -711,7 +720,8 @@ module Definition =
             "insertDebugMarker" => T<string>?markerLabel ^-> T<unit>
             "popDebugGroup" => T<unit> ^-> T<unit>
             "pushDebugGroup" => T<string>?groupLabel ^-> T<unit>
-            "setBindGroup" => T<int>?index * GPUBindGroup?bindGroup * !? (!|T<int>)?dynamicOffsets * !? T<int>?dynamicOffsetStart * !? T<int>?dynamicOffsetLength ^-> T<unit>
+            "setBindGroup" => T<int>?index * GPUBindGroup?bindGroup * !? (!|T<int>+ T<Uint32Array>)?dynamicOffsets * !? T<int>?dynamicOffsetStart * !? T<int>?dynamicOffsetLength ^-> T<unit>
+            "setPipeline" => GPUComputePipeline?pipeline ^-> T<unit>
         ]
 
     let TimestampWrite = 
@@ -726,13 +736,13 @@ module Definition =
 
     let Colors = 
         Pattern.Config "Colors" {
-                Required = [
-                    "r", T<float>
-                    "g", T<float>
-                    "b", T<float>
-                    "a", T<float>
-                ]
-                Optional = []
+            Required = [
+                "r", T<float>
+                "g", T<float>
+                "b", T<float>
+                "a", T<float>
+            ]
+            Optional = []
         }
 
     let ArrayOrColors = !| T<float> + Colors
@@ -756,8 +766,8 @@ module Definition =
             Optional = [
                 "depthClearValue", T<float>
                 "depthLoadOp", LoadOp.Type
-                "depthStoreOp", StoreOp.Type
                 "depthReadOnly", T<bool>
+                "depthStoreOp", StoreOp.Type
                 "stencilClearValue", T<int>
                 "stencilLoadOp", LoadOp.Type
                 "stencilStoreOp", StoreOp.Type
@@ -829,12 +839,528 @@ module Definition =
             "finish" => GPULabel?descriptor ^-> GPURenderBundle
         ]
 
-    
+    let GPUBufferCopyView =
+        Pattern.Config "GPUBufferCopyView" {
+            Required = [
+                "buffer", GPUBuffer.Type
+            ]
+            Optional = [
+                "offset", T<int>
+                "bytesPerRow", T<int>
+                "rowsPerImage", T<int>
+            ]
+        }
+
+    let GPUTextureCopyView = 
+        Class "GPUTextureCopyView"
+        |=> Inherits GPUDestination
+
+    let GPUCommandEncoder =
+        Class "GPUCommandEncoder"
+        |+> Instance [
+            "label" =? T<string>
+
+            "beginComputePass" => !?GPUComputePassDescriptor?descriptor ^-> GPUComputePassEncoder
+            "beginRenderPass" => RenderPassDescriptor?descriptor ^-> GPURenderPassEncoder
+            "clearBuffer" => GPUBuffer?buffer * T<int>?offset * T<int>?size ^-> T<unit>
+            "copyBufferToBuffer" => GPUBuffer?source * T<int>?sourceOffset * GPUBuffer?destination * T<int>?destinationOffset * T<int>?size ^-> T<unit>
+            "copyBufferToTexture" => GPUBufferCopyView?source * GPUTextureCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
+            "copyTextureToBuffer" => GPUTextureCopyView * GPUBufferCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
+            "copyTextureToTexture" => GPUTextureCopyView?source * GPUTextureCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
+            "finish" => T<unit> * !? GPULabel?descriptor ^-> GPUCommandBuffer
+            "insertDebugMarker" => T<string>?markerLabel ^-> T<unit>
+            "popDebugGroup" => T<unit> ^-> T<unit>
+            "pushDebugGroup" => T<string>?groupLabel ^-> T<unit>
+            "resolveQuerySet" => GPUQuerySet?querySet * T<int>?firstQuery * T<int>?queryCount * GPUBuffer?destination * T<int>?destinationOffset ^-> T<unit>
+            "writeTimestamp" => GPUQuerySet?querySet * T<int>?queryIndex ^-> T<unit>
+        ]
+
+    let GPUPipelineLayout = 
+        Class "GPUPipelineLayout" 
+        |=> Inherits GPULabel
+
+    let GPUComputeConstant =  
+        Pattern.Config "GPUComputeConstant" {
+            Required = [
+                "has_point_light", T<bool>
+                "specular_param", T<float>
+                "gain", T<float>
+                "width", T<int>
+                "depth", T<int>
+                "height", T<int>
+            ]
+            Optional = []
+        }
+
+    let GPUCompilationMessage = 
+        Class "GPUCompilationMessage" 
+        |+> Instance [
+            "length" =? T<int>
+            "lineNum" =? T<int>
+            "linePos" =? T<int>
+            "message" =? T<string>
+            "offset" =? T<int>
+            "type" =? GPUCompilationMessageType.Type
+        ]
+
+    let GPUCompilationInfo = 
+        Class "GPUCompilationInfo" 
+        |+> Instance [
+            "messages" =? !| GPUCompilationMessage
+        ]
+        
+    let GPUShaderModule = 
+        Class "GPUShaderModule"
+        |=> Inherits GPULabel
+        |+> Instance [
+            "getCompilationInfo" => T<unit> ^-> T<Promise<_>>[GPUCompilationInfo]
+        ]
+
+    let GPUCompute = 
+        Pattern.Config "GPUCompute" {
+            Required = [
+                "entryPoint", T<string>
+                "module", GPUShaderModule.Type
+            ]
+            Optional = [
+                "compute", !| GPUComputeConstant.Type
+            ]
+        }
+
+    let GPUComputePipelineDescriptor = 
+        Pattern.Config "GPUComputePipelineDescriptor" {
+            Required = [
+                "compute", GPUCompute.Type
+                "layout", T<string> + GPUPipelineLayout.Type
+            ]
+            Optional = [
+                "label", T<string>
+            ]
+        }
+
+    let GPUPipelineLayoutDescriptor = 
+        Pattern.Config "GPUPipelineLayoutDescriptor" {
+            Required = [
+                "bindGroupLayouts", !| GPUBindGroupLayout
+            ]
+            Optional = [
+                "label", T<string>
+            ]
+        }
+
+    let GPUQuerySetDescriptor = 
+        Pattern.Config "GPUQuerySetDescriptor" {
+            Required = [
+                "count", T<int>
+                "type", GPUQueryType.Type
+            ]
+            Optional = [
+                "label", T<string>
+            ]
+        }
+
+    let GPURenderBundleEncoderDescriptor = 
+        Pattern.Config "GPURenderBundleEncoderDescriptor" {
+            Required = [
+                "colorFormats", !| GPUFormat.Type
+            ]
+            Optional = [
+                "depthReadOnly", T<bool>
+                "depthStencilFormat", GPUFormat.Type
+                "label", T<string>
+                "sampleCount", T<int>
+                "stencilReadOnly", T<bool>
+            ]
+        }
+
+    let StencilFaceState =
+        Pattern.Config "StencilFaceState" {
+            Required = []
+            Optional = [
+                "compare", Compare.Type
+                "depthFailOp", StencilOperation.Type
+                "failOp", StencilOperation.Type
+                "passOp", StencilOperation.Type
+            ]
+        }
+
+    let DepthStencilObject =
+        Pattern.Config "DepthStencilObject" {
+            Required = [
+                "depthCompare", Compare.Type
+                "depthWriteEnabled", T<bool>
+                "format", GPUFormat.Type
+            ]
+            Optional = [
+                "depthBias", T<int>
+                "depthBiasClamp", T<int>
+                "depthBiasSlopeScale", T<int>
+                "stencilBack", StencilFaceState.Type
+                "stencilFront", StencilFaceState.Type                
+                "stencilReadMask", T<uint>
+                "stencilWriteMask", T<uint>
+            ]
+        }    
+
+    let BlendComponent =
+        Pattern.Config "BlendComponent" {
+            Required = []
+            Optional = [
+                "dstFactor", BlendFactor.Type
+                "operation", BlendOperation.Type
+                "srcFactor", BlendFactor.Type
+            ]
+        }
+
+    let BlendState =
+        Pattern.Config "BlendState" {
+            Required = []
+            Optional = [
+                "alpha", BlendComponent.Type
+                "color", BlendComponent.Type
+            ]
+        }
+
+    let ColorTargetState =
+        Pattern.Config "ColorTargetState" {
+            Required = [
+                "format", GPUFormat.Type
+            ]
+            Optional = [
+                "blend", BlendState.Type
+                "writeMask", GPUColorWrite.Type
+            ]
+        }
+
+    let FragmentObject = 
+        Pattern.Config "FragmentObject" {
+            Required = [
+                "entryPoint", T<string>
+                "module", GPUShaderModule.Type
+            ]
+            Optional = [
+                "constants", !| GPUComputeConstant
+                "targets", !| ColorTargetState
+            ]
+        }
+
+    let MultisampleObject =
+        Pattern.Config "MultisampleObject" {
+            Required = []
+            Optional = [
+                "alphaToCoverageEnabled", T<bool>
+                "count", T<int>
+                "mask", T<uint>
+            ]
+        }
+
+    let PrimitiveObject =
+        Pattern.Config "PrimitiveObject" {
+            Required = []
+            Optional = [
+                "cullMode", CullMode.Type
+                "frontFace", FrontFace.Type
+                "stripIndexFormat", StripIndexFormat.Type
+                "topology", Topology.Type
+                "unclippedDepth", T<bool>
+            ]
+        }   
+
+    let VertexAttribute =
+        Pattern.Config "VertexAttribute" {
+            Required = [
+                "format", GPUVertexFormat.Type
+                "offset", T<int>
+                "shaderLocation", T<int>
+            ]
+            Optional = []
+        }
+
+    let VertexBufferLayout =
+        Pattern.Config "VertexBufferLayout" {
+            Required = [
+                "arrayStride", T<int>
+                "attributes", !| VertexAttribute
+            ]
+            Optional = [
+                "stepMode", StepMode.Type
+            ]
+        }
+
+    let VertexObject =
+        Pattern.Config "VertexObject" {
+            Required = [
+                "entryPoint", T<string>
+                "module", GPUShaderModule.Type
+            ]
+            Optional = [
+                "constants", GPUComputeConstant.Type
+                "buffers", !| VertexBufferLayout
+            ]
+        }
+
+    let GPURenderPipelineDescriptor =
+        Pattern.Config "GPURenderPipelineDescriptor" {
+            Required = [
+                "layout", T<string> + GPUPipelineLayout
+                "vertex", VertexObject.Type
+            ]
+            Optional = [
+                "depthStencil", DepthStencilObject.Type
+                "fragment", FragmentObject.Type
+                "label", T<string>
+                "multisample", MultisampleObject.Type
+                "primitive", PrimitiveObject.Type
+            ]
+        }
+
+    let SamplerDescriptor =
+        Pattern.Config "SamplerDescriptor" {
+            Required = []
+            Optional = [
+                "addressModeU", AddressMode.Type
+                "addressModeV", AddressMode.Type
+                "addressModeW", AddressMode.Type
+                "compare", Compare.Type
+                "label", T<string>
+                "lodMinClamp", T<float>
+                "lodMaxClamp", T<float>
+                "maxAnisotropy", T<int>
+                "magFilter", FilterMode.Type
+                "minFilter", FilterMode.Type
+                "mipmapFilter", FilterMode.Type
+            ]
+        }
+
+    let GPUSamplerDescriptor = 
+        Pattern.Config "GPUSamplerDescriptor" {
+            Required = []
+            Optional = [
+                "addressModeU", AddressMode.Type
+                "addressModeV", AddressMode.Type
+                "addressModeW", AddressMode.Type
+                "compare", Compare.Type
+                "label", T<string>
+                "lodMinClamp", T<int>
+                "lodMaxClamp", T<int>
+                "maxAnisotropy", T<int>
+                "magFilter", FilterMode.Type
+                "minFilter", FilterMode.Type
+                "mipmapFilter", FilterMode.Type
+            ]
+        }
+
+    let GPUSampler = 
+        Class "GPUSampler" 
+        |=> Inherits GPULabel
+
+    let GPUShaderModuleDescriptor =
+        Pattern.Config "ShaderModuleDescriptor" {
+            Required = [
+                "code", T<string>
+            ]
+            Optional = [
+                "hints", !| T<obj>
+                "label", T<string>
+                "sourceMap", T<string>
+            ]
+        }
+
+    let SizeObject =
+        Pattern.Config "SizeObject" {
+            Required = [
+                "width", T<int>
+            ]
+            Optional = [
+                "height", T<int>
+                "depthOrArrayLayers", T<int>
+            ]
+        }
+
+    let GPUTextureDescriptor =
+        Pattern.Config "GPUTextureDescriptor" {
+            Required = [
+                "format", GPUFormat.Type
+                "size",  ArrayOrGPUExtent3D
+                "usage", GPUTextureUsage.Type
+            ]
+            Optional = [
+                "dimension", TextureDimension.Type
+                "label", T<string>
+                "mipLevelCount", T<int>
+                "sampleCount", T<int>
+                "viewFormats", !| GPUFormat
+            ]
+        }
+
+    let GPUExternalTexture = 
+        Class "GPUExternalTexture"
+        |=> Inherits GPULabel
+
+    let GPUExternalTextureDescriptor =
+        Pattern.Config "GPUExternalTextureDescriptor" {
+            Required = [
+                "source", T<HTMLVideoElement>
+            ]
+            Optional = [
+                "colorSpace", VideoColorSpace.Type
+                "label", T<string>
+            ]
+        }
+
+    let GPUError =
+        Class "GPUError"
+        |+> Instance [
+            "message" =? T<string>
+        ]
+
+    let GPUInternalError =
+        Class "GPUInternalError"
+        |=> Inherits GPUError
+        |+> Static [
+            Constructor(T<string>?message ^-> T<unit>)
+        ]
+
+    let GPUOutOfMemoryError =
+        Class "GPUOutOfMemoryError"
+        |=> Inherits GPUError
+        |+> Static [
+            Constructor(T<string>?message ^-> T<unit>)
+        ]
+
+    let GPUValidationError =
+        Class "GPUValidationError"
+        |=> Inherits GPUError
+        |+> Static [
+            Constructor(T<string>?message ^-> T<unit>)
+        ]
+
+    let GPUPopErrorScopeResult = GPUInternalError + GPUOutOfMemoryError + GPUValidationError 
+        
+    let GPUDevice =
+        Class "GPUDevice"
+        |=> Inherits T<Dom.EventTarget>
+        |+> Instance [
+            "features" =? GPUSupportedFeatures
+            "label" =? T<string>
+            "limits" =? GPUSupportedLimits
+            "lost" =? T<Promise<_>>[GPUDeviceLostInfo]
+            "queue" =? GPUQueue
+
+            "createBindGroup" => GPUBindGroupDescriptor?descriptor ^-> GPUBindGroup
+            "createBindGroupLayout" => GPUBindGroupLayoutDescriptor?descriptor ^-> GPUBindGroupLayout
+            "createBuffer" => GPUBufferDescriptor?descriptor ^-> GPUBuffer
+            "createCommandEncoder" => !?GPUCommandEncoderDescriptor?descriptor ^-> GPUCommandEncoder
+            "createComputePipeline" => GPUComputePipelineDescriptor?descriptor ^-> GPUComputePipeline
+            "createComputePipelineAsync" => GPUComputePipelineDescriptor?descriptor ^-> T<Promise<_>>[GPUComputePipeline]
+            "createPipelineLayout" => GPUPipelineLayoutDescriptor?descriptor ^-> GPUPipelineLayout
+            "createQuerySet" => GPUQuerySetDescriptor?descriptor ^-> GPUQuerySet
+            "createRenderBundleEncoder" => GPURenderBundleEncoderDescriptor?descriptor ^-> GPURenderBundleEncoder
+            "createRenderPipeline" => GPURenderPipelineDescriptor?descriptor ^-> GPURenderPipeline
+            "createRenderPipelineAsync" => GPURenderPipelineDescriptor?descriptor ^-> T<Promise<_>>[GPURenderPipeline]
+            "createSampler" => !? GPUSamplerDescriptor?descriptor ^-> GPUSampler
+            "createShaderModule" => GPUShaderModuleDescriptor?descriptor ^-> GPUShaderModule
+            "createTexture" => GPUTextureDescriptor?descriptor ^-> GPUTexture
+            "destroy" => T<unit> ^-> T<unit>
+            "importExternalTexture" => GPUExternalTextureDescriptor?descriptor ^-> GPUExternalTexture
+            "popErrorScope" => T<unit> ^-> T<Promise<_>>[GPUPopErrorScopeResult]
+            "pushErrorScope" => GPUErrorFilter?filter ^-> T<unit>
+        ]
+
+    let GPURequestDeviceDescriptor =
+        Pattern.Config "GPURequestDeviceDescriptor" {
+            Required = []
+            Optional = [
+                "defaultQueue", GPUQueue.Type
+                "label", T<string>
+                "requiredFeatures", !|T<string>
+                "requiredLimits", GPUDevice.Type
+            ]
+        }
+
+    let GPUAdapter = 
+        Class "GPUAdapter"
+        |=> Nested [GPUSupportedFeatures; GPUSupportedLimits; GPUAdapterInfo; GPUDevice]
+        |+> Instance [
+            "features" =? GPUSupportedFeatures.Type
+            "isFallbackAdapter" =? T<bool>
+            "limits" =? GPUSupportedLimits.Type
+
+            "requestAdapterInfo" => T<unit> ^-> T<Promise<_>>[GPUAdapterInfo]
+            "requestDevice" => !?GPURequestDeviceDescriptor?descriptor ^-> T<Promise<_>>[GPUDevice]
+        ] 
+
+    let GPU = 
+        Class "GPU"
+        |=> Nested [WGSLLanguageFeatures; powerPreference; GPUAdapter]
+        |+> Instance [
+            "wgslLanguageFeatures" =? WGSLLanguageFeatures
+
+            "requestAdapter" => !? powerPreference?options ^-> T<Promise<_>>[GPUAdapter]
+            "getPreferredCanvasFormat" => T<unit> ^-> T<string>
+        ]
+
+    let GPUCanvasConfiguration = 
+        Pattern.Config "GPUCanvasConfiguration" {
+            Required = [
+                "device", GPUDevice.Type
+                "format", T<string>
+            ]
+            Optional = [
+                "alphaMode", AlphaMode.Type
+                "colorSpace", ColorSpace.Type
+                "usage", GPUTextureUsage.Type
+                "viewFormats", !| GPUFormat
+            ]
+        }
+
+    let GPUCanvasContext =
+        Class "GPUCanvasContext"
+        |+> Instance [
+            "canvas" =? T<HTMLCanvasElement> + T<OffscreenCanvas>
+
+            "configure" => GPUCanvasConfiguration?configuration ^-> T<unit>
+            "getCurrentTexture" => T<unit> ^-> GPUTexture
+            "unconfigure" => T<unit> ^-> T<unit>
+        ]
+
+    let GPUUncapturedErrorEventOptions = 
+        Pattern.Config "GPUUncapturedErrorEventOptions" {
+            Required = ["error", GPUError.Type]
+            Optional = []
+        }
+
+    let GPUUncapturedErrorEvent = 
+        Class "GPUUncapturedErrorEvent"
+        |=> Inherits T<Dom.EventTarget>
+        |+> Static [
+            Constructor (GPUErrorFilter?``type`` * GPUUncapturedErrorEventOptions?options ^-> T<unit>)
+        ]
+        |+> Instance [
+            "error" =? GPUError
+        ]
+
+    let GPUPipelineErrorReason = 
+        Pattern.EnumStrings "GPUPipelineErrorReason" [
+            "validation"
+            "internal"
+        ]
+
+    let GPUPipelineError = 
+        Class "GPUPipelineError"
+        |=> Inherits T<Dom.Exception>
+        |+> Static [
+            Constructor (GPUPipelineErrorReason.Type?reason * !? T<string>?message ^-> T<unit>)
+        ]
+        |+> Instance [
+            "reason" =? GPUPipelineErrorReason.Type
+        ]
+
         
     let Assembly =
         Assembly [
             Namespace "WebSharper.WebGPU" [
-                 
+                
             ]
         ]
 
