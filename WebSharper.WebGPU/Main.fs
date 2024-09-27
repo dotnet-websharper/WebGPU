@@ -681,6 +681,154 @@ module Definition =
             "destroy" => T<unit> ^-> T<unit>
         ]
 
+    let GPUComputePassTimestampWrites =
+        Pattern.Config "GPUComputePassTimestampWrites" {
+            Required = []
+            Optional = [
+                "location", GPUComputePassLocation.Type
+                "queryIndex", T<int>
+                "querySet", GPUQuerySet.Type
+            ]
+        }
+
+    let GPUComputePassDescriptor =
+        Pattern.Config "GPUComputePassDescriptor" {
+            Required = []
+            Optional = [
+                "label", T<string>
+                "timestampWrites", !| GPUComputePassTimestampWrites
+            ]
+        }
+
+    let GPUComputePassEncoder =
+        Class "GPUComputePassEncoder"
+        |+> Instance [
+            "label" =? T<string>
+
+            "dispatchWorkgroups" => T<int>?workgroupCountX * !? T<int>?workgroupCountY * !? T<int>?workgroupCountZ ^-> T<unit>
+            "dispatchWorkgroupsIndirect" => GPUBuffer?indirectBuffer * T<int>?indirectOffset ^-> T<unit>
+            "end" => T<unit> ^-> T<unit>
+            "insertDebugMarker" => T<string>?markerLabel ^-> T<unit>
+            "popDebugGroup" => T<unit> ^-> T<unit>
+            "pushDebugGroup" => T<string>?groupLabel ^-> T<unit>
+            "setBindGroup" => T<int>?index * GPUBindGroup?bindGroup * !? (!|T<int>)?dynamicOffsets * !? T<int>?dynamicOffsetStart * !? T<int>?dynamicOffsetLength ^-> T<unit>
+        ]
+
+    let TimestampWrite = 
+        Pattern.Config "TimestampWrite" {
+            Required = [
+                "location", TimestampLocation.Type
+                "queryIndex", T<int>
+                "querySet", GPUQuerySet.Type
+            ]
+            Optional = []
+        }
+
+    let Colors = 
+        Pattern.Config "Colors" {
+                Required = [
+                    "r", T<float>
+                    "g", T<float>
+                    "b", T<float>
+                    "a", T<float>
+                ]
+                Optional = []
+        }
+
+    let ArrayOrColors = !| T<float> + Colors
+
+    let ColorAttachmentObject = 
+        Pattern.Config "ColorAttachmentObject" {
+            Required = [
+                "loadOp", LoadOp.Type
+                "storeOp", StoreOp.Type
+                "view", GPUTextureView.Type
+            ]
+            Optional = [
+                "clearValue", ArrayOrColors                
+                "resolveTarget", GPUTextureView.Type                
+            ]
+        }
+
+    let DepthStencilAttachmentObject = 
+        Pattern.Config "DepthStencilAttachmentObject" {
+            Required = []
+            Optional = [
+                "depthClearValue", T<float>
+                "depthLoadOp", LoadOp.Type
+                "depthStoreOp", StoreOp.Type
+                "depthReadOnly", T<bool>
+                "stencilClearValue", T<int>
+                "stencilLoadOp", LoadOp.Type
+                "stencilStoreOp", StoreOp.Type
+                "stencilReadOnly", T<bool>
+                "view", GPUTextureView.Type
+            ]
+        }
+
+    let RenderPassDescriptor = 
+        Pattern.Config "RenderPassDescriptor" {
+            Required = []
+            Optional = [
+                "colorAttachments", !| ColorAttachmentObject
+                "depthStencilAttachment", DepthStencilAttachmentObject.Type
+                "label", T<string>
+                "maxDrawCount", T<int>
+                "occlusionQuerySet", GPUQuerySet.Type
+                "timestampWrites", !| TimestampWrite
+            ]
+        }
+
+    let GPURenderBundle = 
+        Class "GPURenderBundle"
+        |=> Inherits GPULabel
+
+    let GPURenderPipeline = 
+        Class "GPURenderPipeline"
+        |=> Inherits GPULabel
+        |+> Instance [
+            "getBindGroupLayout" => T<int>?index ^-> GPUBindGroupLayout
+        ]
+
+    let GPURenderEncoder = 
+        Class "GPURenderEncoder"
+        |+> Instance [
+            "label" =? T<string>
+
+            "draw" => T<int>?vertexCount * !? T<int>?instanceCount * !? T<int>?firstIndex * !? T<int>?firstInstance ^-> T<unit>
+            "drawIndexed" => T<int>?indexCount * !? T<int>?instanceCount * !? T<int>?firstIndex * !? T<int>?baseVertex * !? T<int>?firstInstance ^-> T<unit>
+            "drawIndexedIndirect" => GPUBuffer?indirectBuffer * T<int>?indirectOffset ^-> T<unit>
+            "drawIndirect" => GPUBuffer?indirectBuffer * T<int>?indirectOffset ^-> T<unit>
+            "insertDebugMarker" => T<string>?markerLabel ^-> T<unit>
+            "popDebugGroup" => T<unit> ^-> T<unit>
+            "pushDebugGroup" => T<string>?groupLabel ^-> T<unit>
+            "setBindGroup" => T<int>?index * GPUBindGroup?bindGroup * !? (!| T<int> + T<Uint32Array>)?dynamicOffsets * !? T<int>?dynamicOffsetsStart * !? T<int>?dynamicOffsetsLength ^-> T<unit>
+            "setIndexBuffer" => GPUBuffer?buffer * IndexFormat?indexFormat * !? T<int>?offset * !? T<int>?size ^-> T<unit>
+            "setPipeline" => GPURenderPipeline?pipeline ^-> T<unit>
+            "setVertexBuffer" => T<int>?slot * GPUBuffer?buffer * !? T<int>?offset * !? T<int>?size ^-> T<unit>
+        ]
+
+    let GPURenderPassEncoder =
+        Class "GPURenderPassEncoder"
+        |=> Inherits GPURenderEncoder
+        |+> Instance [
+            "beginOcclusionQuery" => T<int> ^-> T<unit>
+            "end" => T<unit> ^-> T<unit>
+            "endOcclusionQuery" => T<unit> ^-> T<unit>
+            "executeBundles" => (!| GPURenderBundle)?bundles ^-> T<unit>
+            "setBlendConstant" => ArrayOrColors?color ^-> T<unit>            
+            "setScissorRect" => T<float>?x * T<float>?y * T<float>?width * T<float>?height ^-> T<unit>
+            "setStencilReference" => T<int>?reference ^-> T<unit>            
+            "setViewport" => T<float>?x * T<float>?y * T<float>?width * T<float>?height * T<float>?minDepth * T<float>?maxDepth ^-> T<unit>
+        ] 
+        
+    let GPURenderBundleEncoder = 
+        Class "GPURenderBundleEncoder"
+        |=> Inherits GPURenderEncoder
+        |+> Instance [
+            "finish" => GPULabel?descriptor ^-> GPURenderBundle
+        ]
+
     
         
     let Assembly =
