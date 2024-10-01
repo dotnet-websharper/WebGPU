@@ -1,0 +1,20 @@
+type file
+id WebSharper.WebGPU
+authors
+    IntelliFactory
+owners
+    IntelliFactory
+repositoryType git
+repositoryUrl https://github.com/dotnet-websharper/webgpu/
+licenseUrl https://github.com/dotnet-websharper/webgpu/blob/master/LICENSE.md
+iconUrl https://github.com/dotnet-websharper/core/raw/websharper50/tools/WebSharper.png
+projectUrl https://github.com/dotnet-websharper/webgpu
+description
+    WebSharper bindings for the WebGPU standard
+tags
+    Web JavaScript F# C#
+files
+    ../WebSharper.WebGPU/bin/Release/netstandard2.0/WebSharper.WebGPU.dll ==> lib/netstandard2.0
+    ../WebSharper.WebGPU/bin/Release/netstandard2.0/WebSharper.WebGPU.xml ==> lib/netstandard2.0
+dependencies
+        WebSharper ~> LOCKEDVERSION:[3]
