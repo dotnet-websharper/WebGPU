@@ -15,6 +15,7 @@ tags
     Web JavaScript F# C#
 files
     ../WebSharper.WebGPU/bin/Release/netstandard2.0/WebSharper.WebGPU.dll ==> lib/netstandard2.0
+    ../WebSharper.WebGPU/bin/Release/netstandard2.0/WebSharper.WebGPU.websharper ==> lib/netstandard2.0
     ../WebSharper.WebGPU/bin/Release/netstandard2.0/WebSharper.WebGPU.xml ==> lib/netstandard2.0
 dependencies
         WebSharper ~> LOCKEDVERSION:[3]
