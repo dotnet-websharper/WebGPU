@@ -152,7 +152,7 @@ readback.Unmap()
   per shader, so there is no fixed record for them.
 - **`GPUAdapter.info`** is the current property; `requestAdapterInfo()` was removed
   from the spec and is kept only as an obsolete member.
-- **`adapter.requestAdapter()` may return `null`** (no suitable adapter). The binding
+- **`requestAdapter()` may return `null`** (no suitable adapter). The binding
   keeps the reference types, so check with `isNull (box x)`.
 - **`GPUDevice.lost`** is a `Promise<GPUDeviceLostInfo>`; error scopes are entered
   with `pushErrorScope(filter)` and awaited with `popErrorScope()`.
