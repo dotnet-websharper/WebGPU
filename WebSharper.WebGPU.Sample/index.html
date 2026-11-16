@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSharper.WebGPU — sample</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234f46e5'/%3E%3Cpath d='M4 11.5 8 3l4 8.5-4-2.2z' fill='white'/%3E%3C/svg%3E" />
+    <script>
+        // Apply a previously chosen theme before first paint. Light is the
+        // default; the key is shared with Client.fs (themeStorageKey).
+        try {
+            var t = localStorage.getItem('websharper-webgpu-theme');
+            if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { }
+    </script>
+    <link rel="stylesheet" href="site.css" />
+    <!-- ws-head -->
+</head>
+<body>
+    <header class="app-header">
+        <div class="app-titles">
+            <h1>WebSharper.WebGPU</h1>
+            <p>WebGPU bindings for F# — with <a href="https://websharper.com">WebSharper</a></p>
+        </div>
+        <div class="app-actions">
+            <button class="btn theme-toggle" ws-onclick="ToggleTheme" title="Switch between the light and dark theme">
+                <span>${themeLabel}</span>
+            </button>
+            <a class="app-source" href="https://github.com/dotnet-websharper/WebGPU">Source</a>
+        </div>
+    </header>
+
+    <main class="page">
+        <p class="status" role="status">${status}</p>
+
+        <section class="card">
+            <header class="card-header">
+                <h2>Adapter &amp; device</h2>
+                <p>
+                    <code>navigator.gpu.requestAdapter()</code> → <code>GPUAdapter</code>, then
+                    <code>requestDevice()</code> → <code>GPUDevice</code>. Adapter <code>info</code>,
+                    <code>features</code>, <code>limits</code> and <code>getPreferredCanvasFormat()</code>
+                    are read below.
+                </p>
+            </header>
+            <div class="actions">
+                <button class="btn btn-primary" ws-onclick="RequestAdapter">Request adapter &amp; device</button>
+            </div>
+            <dl class="readouts">
+                <div><dt>Adapter</dt><dd>${adapterInfo}</dd></div>
+                <div><dt>Preferred format</dt><dd>${format}</dd></div>
+                <div><dt>Features</dt><dd class="wrap">${features}</dd></div>
+                <div><dt>Limits</dt><dd class="wrap">${limits}</dd></div>
+            </dl>
+        </section>
+
+        <section class="card">
+            <header class="card-header">
+                <h2>Render pass</h2>
+                <p>
+                    A rotating triangle: a <code>GPUShaderModule</code> (WGSL), a
+                    <code>GPURenderPipeline</code>, a <code>GPUBindGroup</code> with a uniform buffer,
+                    and a <code>GPURenderPassEncoder</code> that clears and draws each frame.
+                </p>
+            </header>
+            <canvas id="gpu-canvas" width="768" height="432"></canvas>
+            <div class="actions">
+                <button class="btn" ws-onclick="ToggleRender">${renderLabel}</button>
+            </div>
+            <p class="hint">${renderState}</p>
+        </section>
+
+        <section class="card">
+            <header class="card-header">
+                <h2>Compute pass</h2>
+                <p>
+                    A WGSL compute shader doubles an array of floats in a storage buffer; the result is
+                    copied to a mappable buffer and read back with <code>mapAsync</code> /
+                    <code>getMappedRange</code>.
+                </p>
+            </header>
+            <div class="actions">
+                <button class="btn" ws-onclick="RunCompute">Run compute</button>
+            </div>
+            <pre class="preview">${computeResult}</pre>
+        </section>
+
+        <section class="card">
+            <header class="card-header">
+                <h2>What this sample exercises</h2>
+            </header>
+            <ul class="features-list">
+                <li><code>navigator.gpu</code>: <code>requestAdapter</code>, <code>getPreferredCanvasFormat</code>, <code>wgslLanguageFeatures</code>.</li>
+                <li><code>GPUAdapter</code>: <code>info</code>, <code>features</code>, <code>limits</code>, <code>isFallbackAdapter</code>, <code>requestDevice</code>.</li>
+                <li><code>GPUDevice</code>: buffer/texture/pipeline/bind-group creation and the default <code>queue</code>.</li>
+                <li>Graphics: shader modules, render pipelines, bind groups, uniform buffers, render passes, <code>draw</code>.</li>
+                <li>Compute: storage buffers, compute pipelines, <code>dispatchWorkgroups</code>, <code>copyBufferToBuffer</code>, <code>mapAsync</code>/<code>getMappedRange</code>.</li>
+            </ul>
+        </section>
+    </main>
+    <script type="module" src="Scripts/WebSharper.WebGPU.Sample.min.js"></script>
+</body>
+</html>

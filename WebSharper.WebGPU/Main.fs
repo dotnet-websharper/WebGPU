@@ -5,15 +5,28 @@ open WebSharper.JavaScript
 open WebSharper.InterfaceGenerator
 
 module Definition =
+    /// Numeric bit-flag constants (WebGPU usage/visibility masks). They are typed as
+    /// `int` so consumers can combine them with F#'s `|||` operator, for example
+    /// `GPUShaderStage.VERTEX ||| GPUShaderStage.FRAGMENT`.
+    let private FlagsEnum name (values: (string * int) seq) =
+        Class name
+        |+> Static [
+            for (n, v) in values ->
+                Getter n T<int>
+                |> WithGetterInline (string v) :> _
+        ]
+
     let PowerPreference = 
         Pattern.EnumStrings "PowerPreference" [
-            "undefined"
             "low-power"
             "high-performance"
         ]
 
     let GPUDeviceLostInfoReason = 
-        Pattern.EnumStrings "GPUDeviceLostInfoReason" ["destroyed"]
+        Pattern.EnumStrings "GPUDeviceLostInfoReason" [
+            "destroyed"
+            "unknown"
+        ]
 
     let GPUAspect = 
         Pattern.EnumStrings "GPUAspect" [
@@ -35,21 +48,24 @@ module Definition =
             "1d"; "2d"; "2d-array"; "cube"; "cube-array"; "3d"
         ]
 
-    let GPUBufferMapSate = 
-        Pattern.EnumStrings "GPUBufferMapSate" [
+    let GPUBufferMapState = 
+        Pattern.EnumStrings "GPUBufferMapState" [
             "unmapped"; "pending"; "mapped"
         ]
 
+    // GPUMapMode values are the numeric bit flags exposed by the browser.
     let GPUMapMode = 
-        Pattern.EnumStrings "GPUMapMode" [
-            "READ"; "WRITE"
+        Pattern.EnumInlines "GPUMapMode" [
+            "READ", "1"
+            "WRITE", "2"
         ]
 
+    // GPUShaderStage values are the numeric bit flags exposed by the browser.
     let GPUShaderStage =
-        Pattern.EnumStrings "GPUShaderStage" [
-            "COMPUTE"; 
-            "FRAGMENT"; 
-            "VERTEX"
+        FlagsEnum "GPUShaderStage" [
+            "VERTEX", 1
+            "FRAGMENT", 2
+            "COMPUTE", 4
         ]
 
     let GPUFormat =
@@ -171,26 +187,26 @@ module Definition =
         ]
 
     let GPUTextureUsage = 
-        Pattern.EnumInlines "GPUTextureUsage" [
-            "COPY_SRC", "1"
-            "COPY_DST", "2"
-            "TEXTURE_BINDING", "4"
-            "STORAGE_BINDING", "8"
-            "RENDER_ATTACHMENT", "16"
+        FlagsEnum "GPUTextureUsage" [
+            "COPY_SRC", 1
+            "COPY_DST", 2
+            "TEXTURE_BINDING", 4
+            "STORAGE_BINDING", 8
+            "RENDER_ATTACHMENT", 16
         ]
 
     let GPUBufferUsage = 
-        Pattern.EnumInlines "GPUBufferUsage" [
-            "MAP_READ", "1"
-            "MAP_WRITE", "2"
-            "COPY_SRC", "4"
-            "COPY_DST", "8"
-            "INDEX", "16"
-            "VERTEX", "32"
-            "UNIFORM", "64"
-            "STORAGE", "128"
-            "INDIRECT", "256"
-            "QUERY_RESOLVE", "512"
+        FlagsEnum "GPUBufferUsage" [
+            "MAP_READ", 1
+            "MAP_WRITE", 2
+            "COPY_SRC", 4
+            "COPY_DST", 8
+            "INDEX", 16
+            "VERTEX", 32
+            "UNIFORM", 64
+            "STORAGE", 128
+            "INDIRECT", 256
+            "QUERY_RESOLVE", 512
         ]
 
     let GPUQueryType =
@@ -264,13 +280,14 @@ module Definition =
             "subtract"
         ]
 
+    // GPUColorWrite values are the numeric bit flags exposed by the browser.
     let GPUColorWrite =
-        Pattern.EnumStrings "GPUColorWrite" [
-            "RED"
-            "GREEN"
-            "BLUE"
-            "ALPHA"
-            "ALL"
+        FlagsEnum "GPUColorWrite" [
+            "RED", 1
+            "GREEN", 2
+            "BLUE", 4
+            "ALPHA", 8
+            "ALL", 15
         ]
 
     let CullMode =
@@ -361,7 +378,7 @@ module Definition =
         ]
 
     let GPUErrorFilter =
-        Pattern.EnumStrings "ErrorFilter" [
+        Pattern.EnumStrings "GPUErrorFilter" [
             "internal"
             "out-of-memory"
             "validation"
@@ -479,6 +496,14 @@ module Definition =
         Class "GPUTextureView"
         |=> Inherits GPULabel
 
+    let GPUExternalTexture = 
+        Class "GPUExternalTexture"
+        |=> Inherits GPULabel
+
+    let GPUSampler = 
+        Class "GPUSampler" 
+        |=> Inherits GPULabel
+
     let CreateViewDescriptor = 
         Pattern.Config "CreateViewDescriptor" {
             Required = []
@@ -505,10 +530,11 @@ module Definition =
             "height" =? T<int>
             "mipLevelCount" =? T<int>
             "sampleCount" =? T<int>
-            "usage" =? GPUTextureUsage.Type
+            "usage" =? T<int>
             "width" =? T<int>
 
-            "createView" => CreateViewDescriptor?descrptor ^-> GPUTextureView
+            "createView" => !? CreateViewDescriptor?descriptor ^-> GPUTextureView
+            "destroy" => T<unit> ^-> T<unit>
         ]
 
     let DestinationOrigin = 
@@ -553,13 +579,13 @@ module Definition =
         |+> Instance [
             "label" =@ T<string>
 
-            "mapState" =? GPUBufferMapSate.Type
+            "mapState" =? GPUBufferMapState.Type
             "size" =? T<int>
-            "usage" =? GPUBufferUsage.Type
+            "usage" =? T<int>
 
             "destroy" => T<unit> ^-> T<unit>
             "getMappedRange" => !? T<int>?offset * !? T<int>?size ^-> T<ArrayBuffer>
-            "mapAsync" => GPUMapMode?mode * !? T<int>?offset * !? T<int>?size ^-> T<Promise<unit>>
+            "mapAsync" => GPUMapMode.Type?mode * !? T<int>?offset * !? T<int>?size ^-> T<Promise<unit>>
             "unmap" => T<unit> ^-> T<unit>
         ]
 
@@ -597,7 +623,7 @@ module Definition =
 
     let ArrayOrSize = !| T<int> + Size
 
-    let Data = T<ArrayBuffer> + T<DataView>
+    let Data = T<ArrayBuffer> + T<ArrayBufferView>
 
     let GPUQueue =
         Class "GPUQueue"
@@ -628,35 +654,120 @@ module Definition =
             ]
         }
 
-    let EntryObject = 
-        Pattern.Config "EntryObject" {
+    let GPUBufferBindingType =
+        Pattern.EnumStrings "GPUBufferBindingType" [
+            "uniform"; "storage"; "read-only-storage"
+        ]
+
+    let GPUSamplerBindingType =
+        Pattern.EnumStrings "GPUSamplerBindingType" [
+            "filtering"; "non-filtering"; "comparison"
+        ]
+
+    let GPUTextureSampleType =
+        Pattern.EnumStrings "GPUTextureSampleType" [
+            "float"; "unfilterable-float"; "depth"; "sint"; "uint"
+        ]
+
+    let GPUStorageTextureAccess =
+        Pattern.EnumStrings "GPUStorageTextureAccess" [
+            "write-only"; "read-only"; "read-write"
+        ]
+
+    let GPUBufferBindingLayout =
+        Pattern.Config "GPUBufferBindingLayout" {
+            Required = []
+            Optional = [
+                "type", GPUBufferBindingType.Type
+                "hasDynamicOffset", T<bool>
+                "minBindingSize", T<int>
+            ]
+        }
+
+    let GPUSamplerBindingLayout =
+        Pattern.Config "GPUSamplerBindingLayout" {
+            Required = []
+            Optional = [
+                "type", GPUSamplerBindingType.Type
+            ]
+        }
+
+    let GPUTextureBindingLayout =
+        Pattern.Config "GPUTextureBindingLayout" {
+            Required = []
+            Optional = [
+                "sampleType", GPUTextureSampleType.Type
+                "viewDimension", DescriptorDimension.Type
+                "multisampled", T<bool>
+            ]
+        }
+
+    let GPUStorageTextureBindingLayout =
+        Pattern.Config "GPUStorageTextureBindingLayout" {
+            Required = []
+            Optional = [
+                "access", GPUStorageTextureAccess.Type
+                "format", GPUFormat.Type
+                "viewDimension", DescriptorDimension.Type
+            ]
+        }
+
+    let GPUExternalTextureBindingLayout =
+        Pattern.Config "GPUExternalTextureBindingLayout" {
+            Required = []
+            Optional = []
+        }
+
+    let GPUBindGroupLayoutEntry = 
+        Pattern.Config "GPUBindGroupLayoutEntry" {
             Required = [
                 "binding", T<int>
-                "visibility", !| GPUShaderStage.Type
+                "visibility", T<int>
             ]
-            Optional = []
+            Optional = [
+                "buffer", GPUBufferBindingLayout.Type
+                "externalTexture", GPUExternalTextureBindingLayout.Type
+                "sampler", GPUSamplerBindingLayout.Type
+                "storageTexture", GPUStorageTextureBindingLayout.Type
+                "texture", GPUTextureBindingLayout.Type
+            ]
         }
 
     let GPUBindGroupLayoutDescriptor = 
         Pattern.Config "GPUBindGroupLayoutDescriptor" {
-            Required = ["entries", !| EntryObject]
+            Required = ["entries", !| GPUBindGroupLayoutEntry.Type]
             Optional = ["label", T<string>]
+        }
+
+    // A resource inside a bind group: a buffer binding, a sampler, a texture view or an external texture.
+    let GPUBindingResource =
+        GPUBufferBinding + GPUSampler + GPUTextureView + GPUExternalTexture
+
+    let GPUBindGroupEntry = 
+        Pattern.Config "GPUBindGroupEntry" {
+            Required = [
+                "binding", T<int>
+                "resource", GPUBindingResource
+            ]
+            Optional = []
         }
 
     let GPUBindGroupDescriptor = 
         Pattern.Config "GPUBindGroupDescriptor" {
             Required = [
+                "entries", !| GPUBindGroupEntry.Type
                 "layout", GPUBindGroupLayout.Type
             ]
-            Optional = []
+            Optional = [
+                "label", T<string>
+            ]
         }
-        |=> Inherits GPUBindGroupLayoutDescriptor
 
     let GPUBufferDescriptor =
         Pattern.Config "GPUBufferDescriptor" {
             Required = [
                 "size", T<int>
-                "usage", GPUBufferUsage.Type
+                "usage", T<int>
             ]
             Optional = [
                 "label", T<string>
@@ -678,7 +789,7 @@ module Definition =
             "label" =@ T<string>
 
             "count" =? T<int>            
-            "type" =? GPUQueryType
+            "type" =? GPUQueryType.Type
 
             "destroy" => T<unit> ^-> T<unit>
         ]
@@ -865,9 +976,9 @@ module Definition =
             "clearBuffer" => GPUBuffer?buffer * T<int>?offset * T<int>?size ^-> T<unit>
             "copyBufferToBuffer" => GPUBuffer?source * T<int>?sourceOffset * GPUBuffer?destination * T<int>?destinationOffset * T<int>?size ^-> T<unit>
             "copyBufferToTexture" => GPUBufferCopyView?source * GPUTextureCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
-            "copyTextureToBuffer" => GPUTextureCopyView * GPUBufferCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
+            "copyTextureToBuffer" => GPUTextureCopyView?source * GPUBufferCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
             "copyTextureToTexture" => GPUTextureCopyView?source * GPUTextureCopyView?destination * ArrayOrGPUExtent3D?copySize ^-> T<unit>
-            "finish" => T<unit> * !? GPULabel?descriptor ^-> GPUCommandBuffer
+            "finish" => !? GPULabel?descriptor ^-> GPUCommandBuffer
             "insertDebugMarker" => T<string>?markerLabel ^-> T<unit>
             "popDebugGroup" => T<unit> ^-> T<unit>
             "pushDebugGroup" => T<string>?groupLabel ^-> T<unit>
@@ -878,19 +989,6 @@ module Definition =
     let GPUPipelineLayout = 
         Class "GPUPipelineLayout" 
         |=> Inherits GPULabel
-
-    let GPUComputeConstant =  
-        Pattern.Config "GPUComputeConstant" {
-            Required = [
-                "has_point_light", T<bool>
-                "specular_param", T<float>
-                "gain", T<float>
-                "width", T<int>
-                "depth", T<int>
-                "height", T<int>
-            ]
-            Optional = []
-        }
 
     let GPUCompilationMessage = 
         Class "GPUCompilationMessage" 
@@ -916,21 +1014,22 @@ module Definition =
             "getCompilationInfo" => T<unit> ^-> T<Promise<_>>[GPUCompilationInfo]
         ]
 
-    let GPUCompute = 
-        Pattern.Config "GPUCompute" {
+    let GPUProgrammableStage = 
+        Pattern.Config "GPUProgrammableStage" {
             Required = [
                 "entryPoint", T<string>
                 "module", GPUShaderModule.Type
             ]
             Optional = [
-                "compute", !| GPUComputeConstant.Type
+                // Pipeline-overridable constants, keyed by name.
+                "constants", T<obj>
             ]
         }
 
     let GPUComputePipelineDescriptor = 
         Pattern.Config "GPUComputePipelineDescriptor" {
             Required = [
-                "compute", GPUCompute.Type
+                "compute", GPUProgrammableStage.Type
                 "layout", T<string> + GPUPipelineLayout.Type
             ]
             Optional = [
@@ -1028,7 +1127,7 @@ module Definition =
             ]
             Optional = [
                 "blend", BlendState.Type
-                "writeMask", GPUColorWrite.Type
+                "writeMask", T<int>
             ]
         }
 
@@ -1039,8 +1138,8 @@ module Definition =
                 "module", GPUShaderModule.Type
             ]
             Optional = [
-                "constants", !| GPUComputeConstant
-                "targets", !| ColorTargetState
+                "constants", T<obj>
+                "targets", !| ColorTargetState.Type
             ]
         }
 
@@ -1094,8 +1193,8 @@ module Definition =
                 "module", GPUShaderModule.Type
             ]
             Optional = [
-                "constants", GPUComputeConstant.Type
-                "buffers", !| VertexBufferLayout
+                "constants", T<obj>
+                "buffers", !| VertexBufferLayout.Type
             ]
         }
 
@@ -1124,8 +1223,8 @@ module Definition =
                 "addressModeW", AddressMode.Type
                 "compare", Compare.Type
                 "label", T<string>
-                "lodMinClamp", T<int>
-                "lodMaxClamp", T<int>
+                "lodMinClamp", T<float>
+                "lodMaxClamp", T<float>
                 "maxAnisotropy", T<int>
                 "magFilter", FilterMode.Type
                 "minFilter", FilterMode.Type
@@ -1133,12 +1232,8 @@ module Definition =
             ]
         }
 
-    let GPUSampler = 
-        Class "GPUSampler" 
-        |=> Inherits GPULabel
-
     let GPUShaderModuleDescriptor =
-        Pattern.Config "ShaderModuleDescriptor" {
+        Pattern.Config "GPUShaderModuleDescriptor" {
             Required = [
                 "code", T<string>
             ]
@@ -1165,20 +1260,16 @@ module Definition =
             Required = [
                 "format", GPUFormat.Type
                 "size",  ArrayOrGPUExtent3D
-                "usage", GPUTextureUsage.Type
+                "usage", T<int>
             ]
             Optional = [
                 "dimension", TextureDimension.Type
                 "label", T<string>
                 "mipLevelCount", T<int>
                 "sampleCount", T<int>
-                "viewFormats", !| GPUFormat
+                "viewFormats", !| GPUFormat.Type
             ]
         }
-
-    let GPUExternalTexture = 
-        Class "GPUExternalTexture"
-        |=> Inherits GPULabel
 
     let GPUExternalTextureDescriptor =
         Pattern.Config "GPUExternalTextureDescriptor" {
@@ -1201,21 +1292,21 @@ module Definition =
         Class "GPUInternalError"
         |=> Inherits GPUError
         |+> Static [
-            Constructor(T<string>?message ^-> T<unit>)
+            Constructor(T<string>?message)
         ]
 
     let GPUOutOfMemoryError =
         Class "GPUOutOfMemoryError"
         |=> Inherits GPUError
         |+> Static [
-            Constructor(T<string>?message ^-> T<unit>)
+            Constructor(T<string>?message)
         ]
 
     let GPUValidationError =
         Class "GPUValidationError"
         |=> Inherits GPUError
         |+> Static [
-            Constructor(T<string>?message ^-> T<unit>)
+            Constructor(T<string>?message)
         ]
 
     let GPUPopErrorScopeResult = GPUInternalError + GPUOutOfMemoryError + GPUValidationError 
@@ -1250,14 +1341,32 @@ module Definition =
             "pushErrorScope" => GPUErrorFilter?filter ^-> T<unit>
         ]
 
+    let GPUQueueDescriptor =
+        Pattern.Config "GPUQueueDescriptor" {
+            Required = []
+            Optional = [
+                "label", T<string>
+            ]
+        }
+
+    let GPURequestAdapterOptions =
+        Pattern.Config "GPURequestAdapterOptions" {
+            Required = []
+            Optional = [
+                "powerPreference", PowerPreference.Type
+                "forceFallbackAdapter", T<bool>
+                "compatibleSurface", T<HTMLCanvasElement> + T<OffscreenCanvas>
+            ]
+        }
+
     let RequestDeviceDescriptor =
         Pattern.Config "RequestDeviceDescriptor" {
             Required = []
             Optional = [
-                "defaultQueue", GPUQueue.Type
+                "defaultQueue", GPUQueueDescriptor.Type
                 "label", T<string>
-                "requiredFeatures", !|T<string>
-                "requiredLimits", GPUDevice.Type
+                "requiredFeatures", !| T<string>
+                "requiredLimits", GPUSupportedLimits.Type
             ]
         }
 
@@ -1265,33 +1374,35 @@ module Definition =
         Class "GPUAdapter"
         |+> Instance [
             "features" =? GPUSupportedFeatures.Type
+            "info" =? GPUAdapterInfo.Type
             "isFallbackAdapter" =? T<bool>
             "limits" =? GPUSupportedLimits.Type
 
             "requestAdapterInfo" => T<unit> ^-> T<Promise<_>>[GPUAdapterInfo]
-            "requestDevice" => !?RequestDeviceDescriptor?descriptor ^-> T<Promise<_>>[GPUDevice]
+            |> ObsoleteWithMessage "requestAdapterInfo() was removed from the WebGPU spec; use the info property instead."
+            "requestDevice" => !? RequestDeviceDescriptor?descriptor ^-> T<Promise<_>>[GPUDevice]
         ] 
 
     let GPU = 
         Class "GPU"
         |+> Instance [
-            "GPUWGSLLanguageFeatures" =? GPUWGSLLanguageFeatures
+            "wgslLanguageFeatures" =? GPUWGSLLanguageFeatures.Type
 
-            "requestAdapter" => !? PowerPreference?options ^-> T<Promise<_>>[GPUAdapter]
-            "getPreferredCanvasFormat" => T<unit> ^-> T<string>
+            "requestAdapter" => !? GPURequestAdapterOptions?options ^-> T<Promise<_>>[GPUAdapter]
+            "getPreferredCanvasFormat" => T<unit> ^-> GPUFormat.Type
         ]
 
     let GPUCanvasConfiguration = 
         Pattern.Config "GPUCanvasConfiguration" {
             Required = [
                 "device", GPUDevice.Type
-                "format", T<string>
+                "format", GPUFormat.Type
             ]
             Optional = [
                 "alphaMode", AlphaMode.Type
                 "colorSpace", ColorSpace.Type
-                "usage", GPUTextureUsage.Type
-                "viewFormats", !| GPUFormat
+                "usage", T<int>
+                "viewFormats", !| GPUFormat.Type
             ]
         }
 
@@ -1313,12 +1424,12 @@ module Definition =
 
     let GPUUncapturedErrorEvent = 
         Class "GPUUncapturedErrorEvent"
-        |=> Inherits T<Dom.EventTarget>
+        |=> Inherits T<Dom.Event>
         |+> Static [
-            Constructor (GPUErrorFilter?``type`` * GPUUncapturedErrorEventOptions?options ^-> T<unit>)
+            Constructor (T<string>?``type`` * GPUUncapturedErrorEventOptions?options)
         ]
         |+> Instance [
-            "error" =? GPUError
+            "error" =? GPUError.Type
         ]
 
     let GPUPipelineErrorReason = 
@@ -1331,7 +1442,7 @@ module Definition =
         Class "GPUPipelineError"
         |=> Inherits T<Dom.Exception>
         |+> Static [
-            Constructor (GPUPipelineErrorReason.Type?reason * !? T<string>?message ^-> T<unit>)
+            Constructor (GPUPipelineErrorReason.Type?reason * !? T<string>?message)
         ]
         |+> Instance [
             "reason" =? GPUPipelineErrorReason.Type
@@ -1380,18 +1491,21 @@ module Definition =
                 ColorSpace; AlphaMode; GPUErrorFilter; VideoColorSpace; TextureDimension; FilterMode; AddressMode; GPUVertexFormat; StepMode; Topology
                 StripIndexFormat; FrontFace; CullMode; GPUColorWrite; BlendOperation; BlendFactor; StencilOperation; Compare; GPUCompilationMessageType
                 IndexFormat; TimestampLocation; StoreOp; LoadOp; GPUComputePassLocation; GPUQueryType; PowerPreference; GPUDeviceLostInfoReason
-                GPUAspect; DestinationColorSpace; GPUTextureDimension; DescriptorDimension; GPUBufferMapSate; GPUMapMode; GPUShaderStage
-                GPUFormat; GPUTextureUsage; GPUBufferUsage
+                GPUAspect; DestinationColorSpace; GPUTextureDimension; DescriptorDimension; GPUBufferMapState; GPUMapMode; GPUShaderStage
+                GPUFormat; GPUTextureUsage; GPUBufferUsage; GPUBufferBindingType; GPUSamplerBindingType; GPUTextureSampleType
+                GPUStorageTextureAccess
                 //Interface
                 GPUTextureDataLayout; GPUImageDestination; GPUDestination; DestinationOrigin; CreateViewDescriptor; GPULabel; GPUImageSource
                 SourceOrigin; GPUWGSLLanguageFeatures; RenderPassDescriptor; DepthStencilAttachmentObject
                 ColorAttachmentObject; Colors; TimestampWrite; GPUComputePassDescriptor; GPUComputePassTimestampWrites; GPUCommandEncoderDescriptor
-                GPUBufferDescriptor; GPUBindGroupDescriptor; GPUBindGroupLayoutDescriptor; EntryObject; GPUBufferBinding; Size; GPUExtent3D
+                GPUBufferDescriptor; GPUBindGroupDescriptor; GPUBindGroupLayoutDescriptor; GPUBindGroupLayoutEntry; GPUBindGroupEntry
+                GPUBufferBinding; GPUBufferBindingLayout; GPUSamplerBindingLayout; GPUTextureBindingLayout
+                GPUStorageTextureBindingLayout; GPUExternalTextureBindingLayout; Size; GPUExtent3D
                 GPUSamplerDescriptor; GPURenderPipelineDescriptor; VertexObject; VertexBufferLayout; VertexAttribute; PrimitiveObject; MultisampleObject
                 FragmentObject; ColorTargetState; BlendState; BlendComponent; DepthStencilObject; StencilFaceState; GPURenderBundleEncoderDescriptor
-                GPUQuerySetDescriptor; GPUPipelineLayoutDescriptor; GPUComputePipelineDescriptor; GPUComputeConstant; GPUTextureCopyView
-                GPUBufferCopyView; GPURenderEncoder; GPUPipelineErrorReason; GPUUncapturedErrorEventOptions; GPUCanvasConfiguration; GPUCompute
-                RequestDeviceDescriptor; GPUExternalTextureDescriptor; GPUTextureDescriptor; SizeObject; GPUShaderModuleDescriptor
+                GPUQuerySetDescriptor; GPUPipelineLayoutDescriptor; GPUComputePipelineDescriptor; GPUProgrammableStage; GPUTextureCopyView
+                GPUBufferCopyView; GPURenderEncoder; GPUPipelineErrorReason; GPUUncapturedErrorEventOptions; GPUCanvasConfiguration
+                RequestDeviceDescriptor; GPUQueueDescriptor; GPURequestAdapterOptions; GPUExternalTextureDescriptor; GPUTextureDescriptor; SizeObject; GPUShaderModuleDescriptor
             ]
         ]
 
